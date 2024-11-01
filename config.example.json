@@ -1,0 +1,30 @@
+﻿{
+    "api_settings": {
+        "api_key": "your-bfl-api-key-here",
+        "width": 1440,
+        "height": 896
+    },
+    "schedule": {
+        "daily_update_time": "00:00"
+    },
+    "storage": {
+        "keep_images_days": 7
+    },
+    "prompts": {
+        "scenes": [
+            "a majestic mountain range at sunset with dramatic clouds",
+            "an ethereal forest with bioluminescent plants and floating lights",
+            "a futuristic cityscape with neon lights reflecting off glass buildings",
+            "an abstract cosmic scene with swirling galaxies and nebulas",
+            "a serene Japanese garden with cherry blossoms and a stone path"
+        ],
+        "styles": [
+            "in a cinematic style with dramatic lighting",
+            "with volumetric fog and ray tracing",
+            "rendered in stunning 8K detail",
+            "with hyperrealistic textures",
+            "in an ethereal dreamlike style"
+        ]
+    },
+    "custom_prompts": []
+}

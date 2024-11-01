@@ -1,0 +1,26 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+generated_images/*
+!generated_images/.gitkeep
+logs/*
+!logs/.gitkeep
+config.local.json
+last_update.txt
+
+# OS specific
+.DS_Store
+Thumbs.db
