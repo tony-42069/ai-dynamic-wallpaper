@@ -2,7 +2,7 @@
 
 An automated wallpaper generation system that uses Black Forest Labs' Flux API to create and set unique AI-generated wallpapers daily.
 
-![Example](./images/example_wallpaper.png)
+<img src="images/example_wallpaper.png" alt="AI Generated Wallpaper Example">
 
 ## Features
 
