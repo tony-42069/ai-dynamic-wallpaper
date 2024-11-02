@@ -2,11 +2,13 @@
 
 An automated wallpaper generation system that uses Black Forest Labs' Flux API to create and set unique AI-generated wallpapers daily.
 
+![Latest Generated Wallpaper](generated_images/image_prompts.txt)
+
 ## Features
 
 - 🎨 Daily AI-generated wallpapers using Flux Pro 1.1
-- 🕒 Configurable update schedule
-- 📁 Automatic image organization and cleanup
+- 🕒 Configurable update schedule (default: midnight)
+- 📁 Automatic image organization
 - 📝 Comprehensive logging system
 - 🔄 Startup integration
 - ⚙️ Customizable prompts and settings
