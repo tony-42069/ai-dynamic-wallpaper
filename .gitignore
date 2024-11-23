@@ -2,6 +2,23 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Virtual Environment
 venv/
@@ -10,17 +27,16 @@ ENV/
 # IDE
 .idea/
 .vscode/
-*.swp
-*.swo
 
-# Project specific
-generated_images/*
-!generated_images/.gitkeep
-logs/*
-!logs/.gitkeep
-config.local.json
+# Logs
+*.log
+logs/
+debug.log
+batch_debug.log
+
+# Generated files
+generated_images/
 last_update.txt
 
-# OS specific
-.DS_Store
-Thumbs.db
+# Local config
+config.local.json

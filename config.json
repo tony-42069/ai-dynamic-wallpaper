@@ -1,29 +1,26 @@
-﻿{
+{
     "api_settings": {
-        "api_key": "your-bfl-api-key-here",
-        "width": 1440,
-        "height": 896
+        "api_key": "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",
+        "width": 1024,
+        "height": 1024
     },
     "schedule": {
-        "daily_update_time": "00:00"
-    },
-    "storage": {
-        "keep_images_days": 7
+        "daily_update_time": "09:00"
     },
     "prompts": {
         "scenes": [
-            "a majestic mountain range at sunset with dramatic clouds",
-            "an ethereal forest with bioluminescent plants and floating lights",
-            "a futuristic cityscape with neon lights reflecting off glass buildings",
-            "an abstract cosmic scene with swirling galaxies and nebulas",
-            "a serene Japanese garden with cherry blossoms and a stone path"
+            "breathtaking mountain landscape at sunset, volumetric lighting, ultra detailed",
+            "ethereal Japanese garden with cherry blossoms and floating lanterns, morning mist",
+            "futuristic cyberpunk cityscape at night, neon reflections, rain-slicked streets",
+            "cosmic scene with colorful nebulas and spiral galaxies, stunning detail",
+            "ancient forest with bioluminescent plants and mystical atmosphere"
         ],
         "styles": [
-            "in a cinematic style with dramatic lighting",
-            "with volumetric fog and ray tracing",
-            "rendered in stunning 8K detail",
-            "with hyperrealistic textures",
-            "in an ethereal dreamlike style"
+            "award winning photography, masterful composition",
+            "cinematic atmosphere, professional lighting",
+            "photorealistic rendering, ultra high definition",
+            "artistic masterpiece, perfect for desktop wallpaper",
+            "stunning colors and contrast, 8k resolution"
         ]
     },
     "custom_prompts": []

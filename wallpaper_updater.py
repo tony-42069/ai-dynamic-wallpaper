@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import requests
 import schedule
@@ -8,214 +9,273 @@ import random
 import ctypes
 from pathlib import Path
 import json
+import traceback
+import torch
+from PIL import Image
+from io import BytesIO
+import base64
 
-class FluxWallpaperManager:
+# Add immediate debugging
+debug_log_path = Path(r"C:\Users\dsade\OneDrive\Desktop\Business\AI\Wallpaper App\debug.log")
+with open(debug_log_path, 'a', encoding='utf-8') as f:
+    f.write(f"\n[{datetime.now()}] Script started\n")
+
+class UnsplashWallpaperManager:
     def __init__(self):
-        """Initialize the wallpaper manager with configuration"""
-        self.base_path = Path(r"C:\Users\dsade\OneDrive\Desktop\Business\AI\Wallpaper App")
-        self.config_path = self.base_path / "config.json"
-        self.images_path = self.base_path / "generated_images"
-        self.logs_path = self.base_path / "logs"
-        self.last_update_file = self.base_path / "last_update.txt"
-        
-        # Load configuration
-        self.load_config()
-        
-        # API endpoints
-        self.generation_endpoint = "https://api.bfl.ml/v1/flux-pro-1.1"
-        self.result_endpoint = "https://api.bfl.ml/v1/get_result"
-        
-        # Create necessary directories
-        self.images_path.mkdir(parents=True, exist_ok=True)
-        self.logs_path.mkdir(parents=True, exist_ok=True)
-        
-        # Setup logging
-        self.log_file = self.logs_path / f"wallpaper_log_{datetime.now().strftime('%Y%m%d')}.txt"
-
-    def get_last_update_date(self):
-        """Get the date of the last wallpaper update"""
-        if self.last_update_file.exists():
-            try:
-                with open(self.last_update_file, 'r') as f:
-                    return datetime.strptime(f.read().strip(), '%Y-%m-%d').date()
-            except:
-                return None
-        return None
-
-    def update_last_update_date(self):
-        """Update the last update date to today"""
-        with open(self.last_update_file, 'w') as f:
-            f.write(datetime.now().strftime('%Y-%m-%d'))
-
-    def should_update_today(self):
-        """Check if we should update the wallpaper today"""
-        last_update = self.get_last_update_date()
-        today = datetime.now().date()
-        
-        if last_update is None or last_update < today:
-            scheduled_time = datetime.strptime(self.config['schedule']['daily_update_time'], '%H:%M').time()
-            current_time = datetime.now().time()
+        try:
+            self.base_path = Path(r"C:\Users\dsade\OneDrive\Desktop\Business\AI\Wallpaper App")
+            self.config_path = self.base_path / "config.json"
+            self.images_path = self.base_path / "generated_images"
+            self.logs_path = self.base_path / "logs"
+            self.last_update_file = self.base_path / "last_update.txt"
+            self.prompt_log_file = self.images_path / "image_prompts.txt"
             
-            # Update if it's past the scheduled time
-            if current_time >= scheduled_time:
-                self.log_event("Time for daily wallpaper update")
-                return True
-            else:
-                self.log_event(f"Waiting for scheduled time: {self.config['schedule']['daily_update_time']}")
-                return False
-        else:
-            self.log_event("Wallpaper already updated today")
-            return False
+            # Create directories
+            self.images_path.mkdir(parents=True, exist_ok=True)
+            self.logs_path.mkdir(parents=True, exist_ok=True)
+            
+            # Setup logging
+            self.log_file = self.logs_path / f"wallpaper_log_{datetime.now().strftime('%Y%m%d')}.txt"
+            
+            # Load config
+            self.load_config()
+            
+            # API endpoint for FLUX through Hugging Face
+            self.api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+            self.headers = {
+                "Authorization": f"Bearer {self.config['api_settings']['api_key']}"
+            }
+            
+            self.prompt_styles = [
+                "a breathtaking mountain vista at golden hour, volumetric god rays, ultra detailed landscape photography, award winning, 8k",
+                "a serene Japanese garden with cherry blossoms, morning mist, masterful composition, professional photography",
+                "a futuristic cityscape at night, neon lights reflecting off glass buildings, cinematic atmosphere, ultra detailed",
+                "an ethereal cosmic scene with nebulas and galaxies, stunning colors, astronomical photography"
+            ]
+            
+            self.negative_prompt = "ugly, blurry, low quality, distorted, disfigured, bad anatomy, watermark, signature, text"
+            
+            self.log_event("Wallpaper Manager initialized successfully")
+            
+        except Exception as e:
+            with open(debug_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n[{datetime.now()}] Error initializing WallpaperManager: {str(e)}")
+            raise
 
-    def load_config(self):
-        """Load configuration from file"""
-        default_config = {
-            "api_settings": {
-                "api_key": "8188616a-0587-4268-9816-48189620b1dd",
-                "width": 1440,
-                "height": 896
-            },
-            "schedule": {
-                "daily_update_time": "00:00"
-            },
-            "storage": {
-                "keep_images_days": 7
-            },
-            "prompts": {
-                "scenes": [
-                    "a majestic mountain range at sunset with dramatic clouds",
-                    "an ethereal forest with bioluminescent plants and floating lights",
-                    "a futuristic cityscape with neon lights reflecting off glass buildings",
-                    "an abstract cosmic scene with swirling galaxies and nebulas",
-                    "a serene Japanese garden with cherry blossoms and a stone path"
-                ],
-                "styles": [
-                    "in a cinematic style with dramatic lighting",
-                    "with volumetric fog and ray tracing",
-                    "rendered in stunning 8K detail",
-                    "with hyperrealistic textures",
-                    "in an ethereal dreamlike style"
-                ]
-            },
-            "custom_prompts": []
-        }
-
-        if not self.config_path.exists():
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(default_config, f, indent=4)
-            self.config = default_config
-        else:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-
-    def generate_prompt(self):
-        """Generate a random prompt using configuration"""
-        if self.config['custom_prompts'] and random.random() < 0.3:
-            prompt = random.choice(self.config['custom_prompts'])
-        else:
-            scene = random.choice(self.config['prompts']['scenes'])
-            style = random.choice(self.config['prompts']['styles'])
-            prompt = f"{scene}, {style}, masterpiece quality, perfect for desktop wallpaper"
-        
-        self.log_event(f"Generated prompt: {prompt}")
-        return prompt
+    def log_prompt(self, image_filename, prompt):
+        """Log the prompt used for each image"""
+        try:
+            with open(self.prompt_log_file, 'a', encoding='utf-8') as f:
+                f.write(f"{image_filename}: {prompt}\n")
+        except Exception as e:
+            self.log_event(f"Error logging prompt: {str(e)}")
 
     def log_event(self, message):
-        """Log events with timestamp"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"[{timestamp}] {message}\n"
-        
-        print(log_entry.strip())
-        with open(self.log_file, 'a', encoding='utf-8') as f:
-            f.write(log_entry)
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_entry = f"[{timestamp}] {message}\n"
+            
+            print(log_entry.strip())  # Console output
+            
+            # Ensure log directory exists
+            self.logs_path.mkdir(parents=True, exist_ok=True)
+            
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+                
+            # Also write to debug log
+            with open(debug_log_path, 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            print(f"Error logging: {str(e)}")
+            with open(debug_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"[{datetime.now()}] Logging Error: {str(e)}\n{traceback.format_exc()}\n")
+
+    def load_config(self):
+        try:
+            if not self.config_path.exists():
+                default_config = {
+                    "schedule": {
+                        "daily_update_time": "00:00"
+                    },
+                    "api_settings": {
+                        "api_key": "YOUR_API_KEY",
+                        "width": 3840,
+                        "height": 2160
+                    }
+                }
+                with open(self.config_path, 'w', encoding='utf-8') as f:
+                    json.dump(default_config, f, indent=4)
+                self.config = default_config
+            else:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    self.config = json.load(f)
+        except Exception as e:
+            with open(debug_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n[{datetime.now()}] Config Load Error: {str(e)}")
+            raise
+
+    def get_last_update(self):
+        try:
+            if not self.last_update_file.exists():
+                return None
+            with open(self.last_update_file, 'r', encoding='utf-8') as f:
+                date_str = f.read().strip()
+                return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            self.log_event(f"Error reading last update: {str(e)}")
+            return None
+
+    def update_last_update_time(self):
+        try:
+            with open(self.last_update_file, 'w', encoding='utf-8') as f:
+                f.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        except Exception as e:
+            self.log_event(f"Error updating last update time: {str(e)}")
+
+    def should_update_wallpaper(self):
+        """Determine if we should update the wallpaper"""
+        try:
+            # Force update for testing
+            return True
+            
+            last_update = self.get_last_update()
+            now = datetime.now()
+            
+            if last_update is None:
+                self.log_event("No previous update found - updating now")
+                return True
+                
+            if last_update.date() < now.date():
+                self.log_event("Last update was yesterday or earlier - updating now")
+                return True
+                
+            scheduled_time = datetime.strptime(self.config['schedule']['daily_update_time'], '%H:%M').time()
+            if last_update.date() == now.date() and now.time() >= scheduled_time and last_update.time() < scheduled_time:
+                self.log_event("Past scheduled time for today - updating now")
+                return True
+                
+            self.log_event(f"Last update was at {last_update}")
+            return False
+        except Exception as e:
+            self.log_event(f"Error checking update status: {str(e)}")
+            return True
+
+    def generate_image(self, prompt):
+        """Generate image using FLUX through Hugging Face API"""
+        try:
+            self.log_event(f"Starting image generation with prompt: {prompt}")
+            self.log_event(f"Using API URL: {self.api_url}")
+            
+            # FLUX uses a simpler parameter set
+            payload = {
+                "inputs": prompt,
+                "parameters": {
+                    "guidance_scale": 3.5,
+                    "num_inference_steps": 50,
+                    "max_sequence_length": 512
+                }
+            }
+            
+            self.log_event(f"Sending request with payload: {json.dumps(payload, indent=2)}")
+            response = requests.post(self.api_url, headers=self.headers, json=payload)
+            
+            self.log_event(f"Response status code: {response.status_code}")
+            self.log_event(f"Response headers: {dict(response.headers)}")
+            
+            if response.status_code != 200:
+                self.log_event(f"Error response content: {response.text}")
+                # Add retry logic for model loading
+                if response.status_code == 503 and "is currently loading" in response.text:
+                    self.log_event("Model is loading, waiting 30 seconds...")
+                    time.sleep(30)
+                    self.log_event("Retrying request after wait...")
+                    response = requests.post(self.api_url, headers=self.headers, json=payload)
+                    self.log_event(f"Retry response status: {response.status_code}")
+                    if response.status_code != 200:
+                        self.log_event(f"Error from API after retry: {response.status_code} - {response.text}")
+                        return None
+                else:
+                    return None
+            
+            try:
+                # Hugging Face returns the image directly in the response content
+                image = Image.open(BytesIO(response.content))
+                self.log_event(f"Successfully created image of size: {image.size}")
+                return image
+            except Exception as img_error:
+                self.log_event(f"Error processing image data: {str(img_error)}")
+                self.log_event(f"Response content type: {type(response.content)}")
+                self.log_event(f"First 100 bytes of response: {response.content[:100]}")
+                return None
+            
+        except Exception as e:
+            self.log_event(f"Error generating image: {str(e)}\n{traceback.format_exc()}")
+            return None
 
     def update_wallpaper(self):
         """Main function to generate and set new wallpaper"""
-        if not self.should_update_today():
-            return
-
-        self.log_event("Starting wallpaper update process")
-        
         try:
+            if not self.should_update_wallpaper():
+                return False
+
+            self.log_event("Starting wallpaper update process")
+            
+            # Generate prompt
+            prompt = random.choice(self.prompt_styles)
+            self.log_event(f"Generated prompt: {prompt}")
+            
             # Generate image
-            headers = {
-                'accept': 'application/json',
-                'x-key': self.config['api_settings']['api_key'],
-                'Content-Type': 'application/json',
-            }
+            self.log_event("Calling image generation...")
+            image = self.generate_image(prompt)
             
-            payload = {
-                'prompt': self.generate_prompt(),
-                'width': self.config['api_settings']['width'],
-                'height': self.config['api_settings']['height'],
-            }
+            if image is None:
+                self.log_event("Image generation failed")
+                return False
             
-            # Submit generation request
-            self.log_event("Submitting generation request to Flux API...")
-            response = requests.post(
-                self.generation_endpoint,
-                headers=headers,
-                json=payload
-            )
+            # Save the image
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            image_filename = f"wallpaper_{timestamp}.png"
+            image_path = self.images_path / image_filename
             
-            if response.status_code != 200:
-                self.log_event(f"Error submitting request: {response.status_code} - {response.text}")
-                return
+            self.log_event(f"Saving image to {image_path}")
+            image.save(image_path)
             
-            request_id = response.json()["id"]
-            self.log_event(f"Generation request submitted successfully. ID: {request_id}")
+            # Log the prompt used for this image
+            self.log_prompt(image_filename, prompt)
             
-            # Poll for results
-            while True:
-                time.sleep(5)
-                result = requests.get(
-                    self.result_endpoint,
-                    headers={'accept': 'application/json', 'x-key': self.config['api_settings']['api_key']},
-                    params={'id': request_id},
-                ).json()
-                
-                if result["status"] == "Ready":
-                    image_url = result['result']['sample']
-                    self.log_event("Image generated successfully")
-                    
-                    # Download and save image
-                    response = requests.get(image_url)
-                    if response.status_code == 200:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        image_path = self.images_path / f"wallpaper_{timestamp}.png"
-                        
-                        with open(image_path, "wb") as f:
-                            f.write(response.content)
-                        
-                        # Set as wallpaper
-                        ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 3)
-                        self.log_event("Wallpaper set successfully")
-                        
-                        # Update last update date
-                        self.update_last_update_date()
-                        
-                        self.log_event("Wallpaper update completed successfully")
-                        break
-                
-                self.log_event(f"Generation status: {result['status']}")
-                
+            # Set as wallpaper
+            self.log_event("Setting as wallpaper")
+            ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 0)
+            
+            # Update last update time
+            self.update_last_update_time()
+            
+            self.log_event("Wallpaper updated successfully")
+            return True
+            
         except Exception as e:
-            self.log_event(f"Error during wallpaper update: {str(e)}")
+            self.log_event(f"Error updating wallpaper: {str(e)}")
+            return False
 
 def main():
-    manager = FluxWallpaperManager()
-    
-    # Schedule daily check
-    schedule.every(1).minutes.do(manager.update_wallpaper)
-    
-    # Run initial check
-    manager.update_wallpaper()
-    
-    # Keep the script running
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    try:
+        with open(debug_log_path, 'a', encoding='utf-8') as f:
+            f.write(f"\n[{datetime.now()}] Main function started\n")
+        
+        manager = UnsplashWallpaperManager()
+        
+        # Single update and exit - better for Task Scheduler
+        manager.update_wallpaper()
+        
+    except Exception as e:
+        with open(debug_log_path, 'a', encoding='utf-8') as f:
+            f.write(f"\n[{datetime.now()}] Critical Error: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    main()
-    
+    try:
+        main()
+    except Exception as e:
+        with open(debug_log_path, 'a', encoding='utf-8') as f:
+            f.write(f"\n[{datetime.now()}] Fatal Error: {str(e)}\n{traceback.format_exc()}")
