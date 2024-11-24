@@ -1,6 +1,6 @@
 {
     "api_settings": {
-        "api_key": "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",
+        "api_key": "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",
         "width": 1024,
         "height": 1024
     },
@@ -9,18 +9,17 @@
     },
     "prompts": {
         "scenes": [
-            "breathtaking mountain landscape at sunset, volumetric lighting, ultra detailed",
-            "ethereal Japanese garden with cherry blossoms and floating lanterns, morning mist",
-            "futuristic cyberpunk cityscape at night, neon reflections, rain-slicked streets",
-            "cosmic scene with colorful nebulas and spiral galaxies, stunning detail",
-            "ancient forest with bioluminescent plants and mystical atmosphere"
+            "breathtaking mountain landscape at sunset with dramatic clouds and volumetric lighting",
+            "ethereal Japanese garden with cherry blossoms, koi pond, and morning mist",
+            "futuristic cyberpunk cityscape at night with neon signs and hover vehicles",
+            "cosmic scene with colorful nebulas, spiral galaxies, and star clusters",
+            "ancient forest with giant trees, bioluminescent plants, and mystical atmosphere"
         ],
         "styles": [
             "award winning photography, masterful composition",
             "cinematic atmosphere, professional lighting",
             "photorealistic rendering, ultra high definition",
-            "artistic masterpiece, perfect for desktop wallpaper",
-            "stunning colors and contrast, 8k resolution"
+            "epic scale, dramatic lighting, atmospheric perspective"
         ]
     },
     "custom_prompts": []

@@ -40,8 +40,8 @@ class UnsplashWallpaperManager:
             # Load config
             self.load_config()
             
-            # API endpoint for FLUX through Hugging Face
-            self.api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+            # API endpoint for Stable Diffusion
+            self.api_url = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"  # Switch to SD 1.5 as it's more commonly available
             self.headers = {
                 "Authorization": f"Bearer {self.config['api_settings']['api_key']}"
             }
@@ -162,101 +162,84 @@ class UnsplashWallpaperManager:
             return True
 
     def generate_image(self, prompt):
-        """Generate image using FLUX through Hugging Face API"""
+        """Generate an image using the Hugging Face API"""
         try:
-            self.log_event(f"Starting image generation with prompt: {prompt}")
-            self.log_event(f"Using API URL: {self.api_url}")
+            self.log_event(f"Generated prompt: {prompt}")
+            self.log_event("Calling image generation...")
             
-            # FLUX uses a simpler parameter set
             payload = {
                 "inputs": prompt,
                 "parameters": {
-                    "guidance_scale": 3.5,
-                    "num_inference_steps": 50,
-                    "max_sequence_length": 512
+                    "guidance_scale": 7.5,
+                    "num_inference_steps": 20,
                 }
             }
             
-            self.log_event(f"Sending request with payload: {json.dumps(payload, indent=2)}")
+            self.log_event("Starting image generation...")
             response = requests.post(self.api_url, headers=self.headers, json=payload)
             
-            self.log_event(f"Response status code: {response.status_code}")
-            self.log_event(f"Response headers: {dict(response.headers)}")
-            
             if response.status_code != 200:
-                self.log_event(f"Error response content: {response.text}")
-                # Add retry logic for model loading
-                if response.status_code == 503 and "is currently loading" in response.text:
-                    self.log_event("Model is loading, waiting 30 seconds...")
-                    time.sleep(30)
-                    self.log_event("Retrying request after wait...")
-                    response = requests.post(self.api_url, headers=self.headers, json=payload)
-                    self.log_event(f"Retry response status: {response.status_code}")
-                    if response.status_code != 200:
-                        self.log_event(f"Error from API after retry: {response.status_code} - {response.text}")
-                        return None
-                else:
-                    return None
-            
-            try:
-                # Hugging Face returns the image directly in the response content
-                image = Image.open(BytesIO(response.content))
-                self.log_event(f"Successfully created image of size: {image.size}")
-                return image
-            except Exception as img_error:
-                self.log_event(f"Error processing image data: {str(img_error)}")
-                self.log_event(f"Response content type: {type(response.content)}")
-                self.log_event(f"First 100 bytes of response: {response.content[:100]}")
+                error_msg = f"Error from API: {response.status_code} - {response.text}"
+                self.log_event(error_msg)
                 return None
-            
-        except Exception as e:
-            self.log_event(f"Error generating image: {str(e)}\n{traceback.format_exc()}")
-            return None
-
-    def update_wallpaper(self):
-        """Main function to generate and set new wallpaper"""
-        try:
-            if not self.should_update_wallpaper():
-                return False
-
-            self.log_event("Starting wallpaper update process")
-            
-            # Generate prompt
-            prompt = random.choice(self.prompt_styles)
-            self.log_event(f"Generated prompt: {prompt}")
-            
-            # Generate image
-            self.log_event("Calling image generation...")
-            image = self.generate_image(prompt)
-            
-            if image is None:
-                self.log_event("Image generation failed")
-                return False
+                
+            image_bytes = response.content
+            image = Image.open(BytesIO(image_bytes))
             
             # Save the image
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             image_filename = f"wallpaper_{timestamp}.png"
             image_path = self.images_path / image_filename
             
-            self.log_event(f"Saving image to {image_path}")
             image.save(image_path)
-            
-            # Log the prompt used for this image
             self.log_prompt(image_filename, prompt)
             
-            # Set as wallpaper
-            self.log_event("Setting as wallpaper")
-            ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 0)
-            
-            # Update last update time
-            self.update_last_update_time()
-            
-            self.log_event("Wallpaper updated successfully")
-            return True
+            return image_path
             
         except Exception as e:
-            self.log_event(f"Error updating wallpaper: {str(e)}")
+            self.log_event(f"Error generating image: {str(e)}")
+            return None
+
+    def set_wallpaper(self, image_path=None):
+        """Set the wallpaper. If image_path is None, use the most recent image."""
+        try:
+            if image_path is None or not os.path.exists(image_path):
+                # Find the most recent image
+                image_files = list(self.images_path.glob("*.png"))
+                if not image_files:
+                    self.log_event("No wallpaper images found")
+                    return False
+                image_path = max(image_files, key=os.path.getctime)
+            
+            if platform.system() == "Windows":
+                ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 3)
+                self.log_event(f"Wallpaper set successfully to {image_path}")
+                
+                # Update last update time
+                with open(self.last_update_file, "w") as f:
+                    f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    
+                return True
+        except Exception as e:
+            self.log_event(f"Error setting wallpaper: {str(e)}")
             return False
+
+    def update_wallpaper(self):
+        """Main function to update the wallpaper"""
+        try:
+            self.log_event("Starting wallpaper update process")
+            
+            # Try to generate a new image
+            new_image_path = self.generate_image(f"{random.choice(self.prompt_styles)}, masterpiece quality, perfect for desktop wallpaper")
+            
+            # Set the wallpaper (will use most recent if generation failed)
+            if self.set_wallpaper(new_image_path):
+                self.log_event("Wallpaper update completed successfully")
+            else:
+                self.log_event("Failed to update wallpaper")
+                
+        except Exception as e:
+            self.log_event(f"Error in update_wallpaper: {str(e)}")
 
 def main():
     try:
