@@ -40,20 +40,20 @@ class UnsplashWallpaperManager:
             # Load config
             self.load_config()
             
-            # API endpoint for Stable Diffusion
-            self.api_url = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"  # Switch to SD 1.5 as it's more commonly available
+            # API endpoint for Flux
+            self.api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
             self.headers = {
                 "Authorization": f"Bearer {self.config['api_settings']['api_key']}"
             }
             
             self.prompt_styles = [
-                "a breathtaking mountain vista at golden hour, volumetric god rays, ultra detailed landscape photography, award winning, 8k",
-                "a serene Japanese garden with cherry blossoms, morning mist, masterful composition, professional photography",
-                "a futuristic cityscape at night, neon lights reflecting off glass buildings, cinematic atmosphere, ultra detailed",
-                "an ethereal cosmic scene with nebulas and galaxies, stunning colors, astronomical photography"
+                "synthwave sunset scene, neon grid ground, purple and orange gradient sky, retro sun, chrome mountains, ultra detailed --ar 16:9 --q 2",
+                "80s retrofuturistic city, neon pink and cyan lights, digital horizon, chrome buildings, vapor aesthetic, detailed --ar 16:9 --q 2",
+                "neo-optimistic future, clean white and chrome structures, hanging gardens, golden hour, hover cars, detailed --ar 16:9 --q 2",
+                "retro digital landscape, neon wireframe terrain, starry purple sky, chrome spheres, synthwave aesthetic, detailed --ar 16:9 --q 2"
             ]
             
-            self.negative_prompt = "ugly, blurry, low quality, distorted, disfigured, bad anatomy, watermark, signature, text"
+            self.negative_prompt = "ugly, blurry, low quality, distorted, disfigured, bad anatomy, watermark, signature, text, pixelated, noise, low resolution, oversaturated, dark, gloomy, dystopian, grungy"
             
             self.log_event("Wallpaper Manager initialized successfully")
             
@@ -170,8 +170,8 @@ class UnsplashWallpaperManager:
             payload = {
                 "inputs": prompt,
                 "parameters": {
-                    "guidance_scale": 7.5,
-                    "num_inference_steps": 20,
+                    "width": self.config['api_settings']['width'],
+                    "height": self.config['api_settings']['height']
                 }
             }
             

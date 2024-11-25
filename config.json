@@ -1,26 +1,10 @@
 {
     "api_settings": {
         "api_key": "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",
-        "width": 1024,
-        "height": 1024
+        "width": 1920,
+        "height": 1080
     },
     "schedule": {
         "daily_update_time": "09:00"
-    },
-    "prompts": {
-        "scenes": [
-            "breathtaking mountain landscape at sunset with dramatic clouds and volumetric lighting",
-            "ethereal Japanese garden with cherry blossoms, koi pond, and morning mist",
-            "futuristic cyberpunk cityscape at night with neon signs and hover vehicles",
-            "cosmic scene with colorful nebulas, spiral galaxies, and star clusters",
-            "ancient forest with giant trees, bioluminescent plants, and mystical atmosphere"
-        ],
-        "styles": [
-            "award winning photography, masterful composition",
-            "cinematic atmosphere, professional lighting",
-            "photorealistic rendering, ultra high definition",
-            "epic scale, dramatic lighting, atmospheric perspective"
-        ]
-    },
-    "custom_prompts": []
+    }
 }
