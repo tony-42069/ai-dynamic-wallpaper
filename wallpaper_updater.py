@@ -40,8 +40,8 @@ class UnsplashWallpaperManager:
             # Load config
             self.load_config()
             
-            # API endpoint for Flux
-            self.api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+            # API endpoint for Stable Diffusion
+            self.api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
             self.headers = {
                 "Authorization": f"Bearer {self.config['api_settings']['api_key']}"
             }
@@ -52,8 +52,6 @@ class UnsplashWallpaperManager:
                 "neo-optimistic future, clean white and chrome structures, hanging gardens, golden hour, hover cars, detailed --ar 16:9 --q 2",
                 "retro digital landscape, neon wireframe terrain, starry purple sky, chrome spheres, synthwave aesthetic, detailed --ar 16:9 --q 2"
             ]
-            
-            self.negative_prompt = "ugly, blurry, low quality, distorted, disfigured, bad anatomy, watermark, signature, text, pixelated, noise, low resolution, oversaturated, dark, gloomy, dystopian, grungy"
             
             self.log_event("Wallpaper Manager initialized successfully")
             
@@ -163,42 +161,63 @@ class UnsplashWallpaperManager:
 
     def generate_image(self, prompt):
         """Generate an image using the Hugging Face API"""
-        try:
-            self.log_event(f"Generated prompt: {prompt}")
-            self.log_event("Calling image generation...")
-            
-            payload = {
-                "inputs": prompt,
-                "parameters": {
-                    "width": self.config['api_settings']['width'],
-                    "height": self.config['api_settings']['height']
-                }
-            }
-            
-            self.log_event("Starting image generation...")
-            response = requests.post(self.api_url, headers=self.headers, json=payload)
-            
-            if response.status_code != 200:
-                error_msg = f"Error from API: {response.status_code} - {response.text}"
-                self.log_event(error_msg)
-                return None
+        max_retries = 3
+        retry_delay = 10  # seconds
+        
+        self.log_event(f"Starting image generation with prompt: {prompt}")
+        
+        for attempt in range(max_retries):
+            try:
+                self.log_event(f"Attempt {attempt + 1} of {max_retries}")
                 
-            image_bytes = response.content
-            image = Image.open(BytesIO(image_bytes))
-            
-            # Save the image
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            image_filename = f"wallpaper_{timestamp}.png"
-            image_path = self.images_path / image_filename
-            
-            image.save(image_path)
-            self.log_prompt(image_filename, prompt)
-            
-            return image_path
-            
-        except Exception as e:
-            self.log_event(f"Error generating image: {str(e)}")
-            return None
+                payload = {
+                    "inputs": prompt
+                }
+                
+                self.log_event(f"Sending request to {self.api_url}")
+                response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=60)
+                self.log_event(f"Received response with status code: {response.status_code}")
+                
+                if response.status_code == 200:
+                    try:
+                        image_bytes = response.content
+                        image = Image.open(BytesIO(image_bytes))
+                        
+                        # Save the image
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        image_filename = f"wallpaper_{timestamp}.png"
+                        image_path = self.images_path / image_filename
+                        
+                        image.save(image_path)
+                        self.log_event(f"Successfully saved image to {image_path}")
+                        self.log_prompt(image_filename, prompt)
+                        
+                        return image_path
+                    except Exception as e:
+                        self.log_event(f"Error processing image response: {str(e)}")
+                        if attempt < max_retries - 1:
+                            continue
+                        
+                elif response.status_code in [503, 429, 500, 502, 504]:
+                    self.log_event(f"Service error (attempt {attempt + 1}): {response.status_code} - {response.text}")
+                    if attempt < max_retries - 1:
+                        self.log_event(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        continue
+                else:
+                    self.log_event(f"Error from API: {response.status_code} - {response.text}")
+                    return None
+                    
+            except Exception as e:
+                self.log_event(f"Request error: {str(e)}")
+                if attempt < max_retries - 1:
+                    self.log_event(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                return None
+        
+        self.log_event("Max retries exceeded, could not generate image")
+        return None
 
     def set_wallpaper(self, image_path=None):
         """Set the wallpaper. If image_path is None, use the most recent image."""
