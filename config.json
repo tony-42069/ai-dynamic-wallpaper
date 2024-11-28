@@ -1,8 +1,8 @@
 {
     "api_settings": {
         "api_key": "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",
-        "width": 1920,
-        "height": 1080
+        "width": 3840,
+        "height": 2160
     },
     "schedule": {
         "daily_update_time": "09:00"
