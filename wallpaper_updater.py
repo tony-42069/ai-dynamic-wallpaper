@@ -191,7 +191,16 @@ def main():
         print("Manager initialized successfully")
         
         print("Generating new wallpaper...")
-        prompt = "ultra high quality cinematic landscape, stunning 8k resolution, breathtaking vista, perfect composition, golden ratio, masterful photography --ar 16:9 --q 2 --s 750"
+        prompts = [
+            "cyberpunk cityscape at night, neon lights, holographic displays, flying cars, ultra detailed, synthwave colors, neo-optimistic future, 8k resolution, cinematic lighting --ar 16:9 --q 2",
+            "solarpunk utopia, bioluminescent plants, clean energy technology, crystal spires, neon accents, hopeful future, ultra detailed, 8k resolution --ar 16:9 --q 2",
+            "synthwave sunset over cyber city, retrowave aesthetics, neon grid, digital horizon, vibrant purple and blue, ultra detailed, 8k resolution --ar 16:9 --q 2",
+            "neo-tokyo cityscape, cherry blossoms with neon lights, cyberpunk aesthetic, floating holograms, optimistic future, ultra detailed, 8k resolution --ar 16:9 --q 2",
+            "digital dreamscape, vaporwave aesthetics, geometric patterns, neon synthwave sun, chrome and glass structures, ultra detailed, 8k resolution --ar 16:9 --q 2"
+        ]
+        
+        prompt = random.choice(prompts)
+        print(f"Selected prompt: {prompt}")
         image_path = manager.generate_image(prompt)
         
         if image_path:
