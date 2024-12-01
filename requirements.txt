@@ -1,8 +1,7 @@
-torch>=2.1.0
-diffusers>=0.24.0
-transformers>=4.35.0
-accelerate>=0.24.0
-bitsandbytes>=0.41.0
-pillow>=10.1.0
+torch>=2.0.0
+diffusers>=0.21.0
+transformers>=4.31.0
+accelerate>=0.21.0
+pillow>=10.0.0
 requests>=2.31.0
 schedule>=1.2.0

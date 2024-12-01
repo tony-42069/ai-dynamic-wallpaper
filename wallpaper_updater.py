@@ -6,10 +6,13 @@ import platform
 import random
 import ctypes
 from pathlib import Path
-import json
-import requests
+import torch
+from diffusers import FluxPipeline
 from PIL import Image
-from io import BytesIO
+from huggingface_hub import login
+
+# Login to Hugging Face
+login(token="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")
 
 # Add immediate debugging
 debug_log_path = Path(r"C:\Users\dsade\OneDrive\Desktop\Business\AI\Wallpaper App\debug.log")
@@ -22,19 +25,19 @@ class WallpaperManager:
             self.base_path = Path(r"C:\Users\dsade\OneDrive\Desktop\Business\AI\Wallpaper App")
             self.images_path = self.base_path / "images"
             self.last_update_file = self.base_path / "last_update.txt"
-            self.api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-            self.headers = {"Authorization": "Bearer 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"}
-            self.config = {
-                "api_settings": {
-                    "width": 1920,
-                    "height": 1080
-                }
-            }
             
             # Create directories if they don't exist
             self.images_path.mkdir(parents=True, exist_ok=True)
             
-            self.log_event("Wallpaper Manager initialized successfully")
+            # Initialize FLUX pipeline exactly as in example
+            self.log_event("Initializing FLUX pipeline...")
+            self.pipe = FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-dev", 
+                torch_dtype=torch.bfloat16,
+                use_auth_token="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"
+            )
+            self.pipe.enable_model_cpu_offload()
+            self.log_event("FLUX pipeline initialized successfully")
             
         except Exception as e:
             with open(debug_log_path, 'a', encoding='utf-8') as f:
@@ -51,119 +54,35 @@ class WallpaperManager:
         except Exception as e:
             print(f"Error logging: {str(e)}")
 
-    def get_random_image(self):
-        """Get a random image from the images folder"""
-        try:
-            image_files = [f for f in self.images_path.glob("*") if f.suffix.lower() in ['.jpg', '.jpeg', '.png']]
-            if not image_files:
-                self.log_event("No images found in images folder")
-                return None
-            return random.choice(image_files)
-        except Exception as e:
-            self.log_event(f"Error getting random image: {str(e)}")
-            return None
-
-    def set_wallpaper(self, image_path=None):
-        """Set the wallpaper"""
-        try:
-            if image_path is None:
-                image_path = self.get_random_image()
-                if image_path is None:
-                    return False
-            
-            if platform.system() == "Windows":
-                ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 3)
-                self.log_event(f"Wallpaper set successfully to {image_path}")
-                return True
-            return False
-        except Exception as e:
-            self.log_event(f"Error setting wallpaper: {str(e)}")
-            return False
-
-    def update_wallpaper(self):
-        """Main function to update the wallpaper"""
-        try:
-            self.log_event("Starting wallpaper update process")
-            if self.set_wallpaper():
-                self.log_event("Wallpaper update completed successfully")
-                # Update last update time
-                with open(self.last_update_file, "w") as f:
-                    f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            else:
-                self.log_event("Failed to update wallpaper")
-        except Exception as e:
-            self.log_event(f"Error in update_wallpaper: {str(e)}")
-
     def generate_image(self, prompt):
-        """Generate an image using the Hugging Face API"""
-        max_retries = 5  # Increased retries
-        retry_delay = 20  # Increased delay between retries
-        
-        self.log_event(f"Starting image generation with prompt: {prompt}")
-        
-        for attempt in range(max_retries):
-            try:
-                self.log_event(f"Attempt {attempt + 1} of {max_retries}")
-                
-                payload = {
-                    "inputs": prompt,
-                    "parameters": {
-                        "width": self.config['api_settings']['width'],
-                        "height": self.config['api_settings']['height'],
-                        "num_inference_steps": 30,  # Reduced steps for faster generation
-                        "guidance_scale": 7.5
-                    }
-                }
-                
-                self.log_event(f"Sending request to {self.api_url}")
-                response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=180)  # Increased timeout
-                self.log_event(f"Received response with status code: {response.status_code}")
-                
-                if response.status_code == 200:
-                    try:
-                        image_bytes = response.content
-                        image = Image.open(BytesIO(image_bytes))
-                        
-                        # Save the image
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        image_filename = f"wallpaper_{timestamp}.png"
-                        image_path = self.images_path / image_filename
-                        
-                        image.save(image_path)
-                        self.log_event(f"Successfully saved image to {image_path}")
-                        self.log_prompt(image_filename, prompt)
-                        
-                        return image_path
-                    except Exception as e:
-                        self.log_event(f"Error processing image response: {str(e)}")
-                        if attempt < max_retries - 1:
-                            time.sleep(retry_delay)
-                            continue
-                        
-                elif response.status_code in [503, 429, 500, 502, 504]:
-                    self.log_event(f"Service error (attempt {attempt + 1}): {response.status_code} - {response.text}")
-                    if attempt < max_retries - 1:
-                        # Exponential backoff
-                        wait_time = retry_delay * (attempt + 1)
-                        self.log_event(f"Retrying in {wait_time} seconds...")
-                        time.sleep(wait_time)
-                        continue
-                else:
-                    # If we get an unexpected error, try to use the most recent image
-                    self.log_event(f"Error from API: {response.status_code} - {response.text}")
-                    return self.get_most_recent_image()
-                    
-            except Exception as e:
-                self.log_event(f"Request error: {str(e)}")
-                if attempt < max_retries - 1:
-                    wait_time = retry_delay * (attempt + 1)
-                    self.log_event(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    continue
-                return self.get_most_recent_image()
-        
-        self.log_event("Max retries exceeded, using most recent image")
-        return self.get_most_recent_image()
+        """Generate an image using FLUX"""
+        try:
+            self.log_event(f"Starting image generation with prompt: {prompt}")
+            
+            # Generate image with FLUX exactly as in example
+            image = self.pipe(
+                prompt,
+                height=1080,  # Changed for wallpaper aspect ratio
+                width=1920,   # Changed for wallpaper aspect ratio
+                guidance_scale=3.5,
+                num_inference_steps=50,
+                max_sequence_length=512,
+                generator=torch.Generator("cpu").manual_seed(random.randint(0, 1000000))
+            ).images[0]
+            
+            # Save the image
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            image_filename = f"wallpaper_{timestamp}.png"
+            image_path = self.images_path / image_filename
+            
+            image.save(image_path)
+            self.log_event(f"Successfully saved image to {image_path}")
+            
+            return image_path
+            
+        except Exception as e:
+            self.log_event(f"Error generating image: {str(e)}")
+            return self.get_most_recent_image()
 
     def get_most_recent_image(self):
         """Get the most recently generated image"""
@@ -177,12 +96,22 @@ class WallpaperManager:
             self.log_event(f"Error getting recent image: {str(e)}")
             return None
 
-    def log_prompt(self, image_filename, prompt):
+    def set_wallpaper(self, image_path=None):
+        """Set the wallpaper"""
         try:
-            with open(self.base_path / "prompts.log", "a", encoding='utf-8') as f:
-                f.write(f"{image_filename}: {prompt}\n")
+            if image_path is None:
+                image_path = self.get_most_recent_image()
+                if image_path is None:
+                    return False
+            
+            if platform.system() == "Windows":
+                ctypes.windll.user32.SystemParametersInfoW(20, 0, str(image_path), 3)
+                self.log_event(f"Wallpaper set successfully to {image_path}")
+                return True
+            return False
         except Exception as e:
-            self.log_event(f"Error logging prompt: {str(e)}")
+            self.log_event(f"Error setting wallpaper: {str(e)}")
+            return False
 
 def main():
     print("Starting wallpaper updater...")
@@ -192,11 +121,11 @@ def main():
         
         print("Generating new wallpaper...")
         prompts = [
-            "cyberpunk cityscape at night, neon lights, holographic displays, flying cars, ultra detailed, synthwave colors, neo-optimistic future, 8k resolution, cinematic lighting --ar 16:9 --q 2",
-            "solarpunk utopia, bioluminescent plants, clean energy technology, crystal spires, neon accents, hopeful future, ultra detailed, 8k resolution --ar 16:9 --q 2",
-            "synthwave sunset over cyber city, retrowave aesthetics, neon grid, digital horizon, vibrant purple and blue, ultra detailed, 8k resolution --ar 16:9 --q 2",
-            "neo-tokyo cityscape, cherry blossoms with neon lights, cyberpunk aesthetic, floating holograms, optimistic future, ultra detailed, 8k resolution --ar 16:9 --q 2",
-            "digital dreamscape, vaporwave aesthetics, geometric patterns, neon synthwave sun, chrome and glass structures, ultra detailed, 8k resolution --ar 16:9 --q 2"
+            "a cyberpunk cityscape at dusk, neon-lit skyscrapers reflecting in rain puddles, holographic advertisements floating in the air, flying vehicles with light trails, cinematic, ultra detailed",
+            "solarpunk utopia, bioluminescent crystal towers, floating gardens with exotic plants, clean energy tech integrated with nature, ethereal lighting",
+            "synthwave dreamscape, digital grid horizon, chrome mountains, neon sun setting behind geometric shapes, retro-futuristic aesthetic",
+            "neo-tokyo street scene, cherry blossom petals floating through neon rain, holographic shop signs, cyberpunk fashion, moody atmospheric lighting",
+            "vaporwave paradise, ancient statues with neon outlines, digital waterfalls, chrome spheres floating in pink sky, retro-future aesthetic"
         ]
         
         prompt = random.choice(prompts)
